@@ -72,13 +72,6 @@ def test_create_payload():
 
     kw = evaluate_disclosure(_payload, payload._disclosure)
 
-    # _discl = [parse_disclosure(d, hash_func='sha-256') for d in payload._disclosure]
-    #
-    # kw = {}
-    # for _disc, _hash in _discl:
-    #     if _hash in _payload['_sd']:
-    #         kw[_disc[1]] = _disc[2]
-
     assert set(kw.keys()) == {'phone_number', 'updated_at', 'phone_number_verified', 'address',
                               'birthdate', 'family_name', 'email', 'given_name',
                               'exp', 'sub', 'iss', 'iat', 'nationalities'}

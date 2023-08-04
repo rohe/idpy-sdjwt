@@ -11,8 +11,8 @@ class Payload(object):
 
     def __init__(self, **kwargs):
         self.args = kwargs
-        self._disclosure = []
-        self._hash = []
+        self.disclosure = []
+        self.hash = []
 
     def add_object_disclosure(self, key: str, value: str):
         _val = self.args.get(key)
@@ -38,13 +38,13 @@ class Payload(object):
     def _const(self, val, hash_func):
         if isinstance(val, ObjectDisclosure):
             _discl, _hash = val.make(hash_func)
-            self._disclosure.append(_discl)
-            self._hash.append(_hash)
+            self.disclosure.append(_discl)
+            self.hash.append(_hash)
             return None
         elif isinstance(val, ArrayDisclosure):
             res = []
             for _discl, _hash in val.make(hash_func):
-                self._disclosure.append(_discl)
+                self.disclosure.append(_discl)
                 res.append({"...": f"{_hash}"})
             return res
         else:
@@ -81,8 +81,8 @@ class Payload(object):
             if vis:
                 res[key] = vis
 
-        self._hash.sort()
-        res['_sd'] = self._hash
+        self.hash.sort()
+        res['_sd'] = self.hash
         res['_sd_alg'] = hash_func.lower()
         if signing_key:
             res['cnf'] = {
