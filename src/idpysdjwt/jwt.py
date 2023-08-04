@@ -63,4 +63,8 @@ class SDJWT(JWT):
         return json.dumps(_load)
 
     def get_disclosure(self):
-        return self.payload.disclosure
+        if not self.payload.disclosure:
+            return ""
+        else:
+            return self.payload.disclosure
+

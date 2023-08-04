@@ -1,12 +1,11 @@
-
 import os
 
 from cryptojwt import KeyBundle
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
 
+from idpysdjwt.entity import Receiver
 from idpysdjwt.entity import Sender
-from idpysdjwt.jwt import SDJWT
 from idpysdjwt.payload import evaluate_disclosure
 
 ALICE = "https://example.org/alice"
@@ -37,6 +36,10 @@ kb2 = KeyBundle(
 ALICE_KEY_JAR = KeyJar()
 ALICE_KEY_JAR.add_kb(ALICE, kb1)
 ALICE_KEY_JAR.add_kb(ALICE, kb2)
+# Load the opponents keys
+_jwks = ALICE_KEY_JAR.export_jwks_as_json(issuer_id=ALICE)
+BOB_KEY_JAR = KeyJar()
+BOB_KEY_JAR.import_jwks_as_json(_jwks, ALICE)
 
 EndUserClaims = {
     "given_name": "John",
@@ -102,3 +105,26 @@ def test_sender():
     assert set(kw['nationalities']) == {"US", "DE"}
 
 
+def test_sender_receiver():
+    alice = Sender(
+        key_jar=ALICE_KEY_JAR,
+        iss=ALICE,
+        sign_alg="RS256",
+        lifetime=600,
+        objective_disclosure=EndUserClaims,
+        array_disclosure=SELDISC
+    )
+
+    payload = {"sub": "sub", "aud": BOB}
+    _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+
+    # msg is what is sent to the receiver
+
+    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob.parse(_msg)
+
+    assert set(bob.payload.keys()) == {'phone_number', 'updated_at', 'phone_number_verified',
+                                       'address','birthdate', 'family_name', 'email', 'given_name',
+                                       'exp', 'sub', 'iss', 'iat', 'nationalities', 'aud', 'cnf'}
+
+    assert set(bob.payload['nationalities']) == {"US", "DE"}
