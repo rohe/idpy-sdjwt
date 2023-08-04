@@ -1,6 +1,7 @@
 from idpysdjwt.disclosure import ObjectDisclosure
 from idpysdjwt.disclosure import parse_disclosure
 from idpysdjwt.payload import Payload
+from idpysdjwt.payload import evaluate_disclosure
 
 
 def test_disclosure_1():
@@ -69,6 +70,17 @@ def test_create_payload():
     assert len(_payload['nationalities']) == 2
     assert len(_payload['_sd']) == 8
 
-    _discl = [parse_disclosure(d, hash_func='sha-256') for d in payload._disclosure]
+    kw = evaluate_disclosure(_payload, payload._disclosure)
 
-    assert _discl
+    # _discl = [parse_disclosure(d, hash_func='sha-256') for d in payload._disclosure]
+    #
+    # kw = {}
+    # for _disc, _hash in _discl:
+    #     if _hash in _payload['_sd']:
+    #         kw[_disc[1]] = _disc[2]
+
+    assert set(kw.keys()) == {'phone_number', 'updated_at', 'phone_number_verified', 'address',
+                              'birthdate', 'family_name', 'email', 'given_name',
+                              'exp', 'sub', 'iss', 'iat', 'nationalities'}
+
+    assert set(kw['nationalities']) == {"US", "DE"}
