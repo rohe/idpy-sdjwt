@@ -3,7 +3,7 @@ from typing import List
 
 from cryptojwt import JWT
 from cryptojwt import KeyJar
-
+from idpysdjwt.disclosure import parse_disclosure
 from idpysdjwt.payload import Payload
 
 
@@ -53,11 +53,8 @@ class SDJWT(JWT):
     def message(self, signing_key, **kwargs):
         self.payload.args = kwargs
 
-        for key, val in self.objective_disclosure.items():
-            self.payload.add_object_disclosure(key, val)
-
-        for key, val in self.array_disclosure.items():
-            self.payload.add_array_disclosure(key, val)
+        self.payload.add_objects([], self.objective_disclosure)
+        self.payload.add_arrays([], self.array_disclosure)
 
         _load = self.payload.create(hash_func='sha-256', signing_key=signing_key)
         return json.dumps(_load)
@@ -68,3 +65,43 @@ class SDJWT(JWT):
         else:
             return self.payload.disclosure
 
+    def _expand_array_disclosure(self, val):
+        res = []
+        for v in val:
+            if isinstance(v, list) and "..." in v[0]:
+                for ad in v:
+                    _val = self._hash_dict.get(ad["..."])
+                    if _val:
+                        res.append(_val[1])
+            else:
+                res.append(v)
+        return res
+
+    def _process(self, item: dict) -> dict:
+        res = {}
+
+        for _hash in item.get("_sd", []):
+            _val = self._hash_dict.get(_hash)
+            if _val:
+                res.update({_val[1]: _val[2]})
+
+        for k, v in item.items():
+            if k in ['_sd', '_sd_alg']:
+                continue
+
+            if isinstance(v, dict):
+                res[k] = self._process(v)
+            elif isinstance(v, list):
+                res[k] = self._expand_array_disclosure(v)
+            else:
+                res[k] = v
+
+        return res
+
+    def evaluate(self, jwt_payload, selective_disclosures):
+        _discl = [parse_disclosure(d, hash_func='sha-256') for d in selective_disclosures]
+        self._hash_dict = {_hash: _disc for _disc, _hash in _discl}
+
+        res = self._process(jwt_payload)
+
+        return res

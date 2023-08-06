@@ -3,10 +3,9 @@ from typing import List
 from cryptojwt import KeyJar
 from cryptojwt.jwk import DIGEST_HASH
 from cryptojwt.jws.jws import SIGNER_ALGS
-
 from idpysdjwt import SD_TYP
 from idpysdjwt.jwt import SDJWT
-from idpysdjwt.payload import evaluate_disclosure
+
 
 
 class Sender(SDJWT):
@@ -131,6 +130,24 @@ class Receiver(SDJWT):
 
         self.payload = {}
         self.jwt = None
+        self._hash_dict = {}
+
+    def add_value(self, orig, new):
+        if orig:
+            if isinstance(orig, list):
+                if isinstance(new, list):
+                    orig.extend(new)
+                else:
+                    orig.append(new)
+            else:
+                orig = [orig]
+                if isinstance(new, list):
+                    orig.extend(new)
+                else:
+                    orig.append(new)
+            return orig
+        else:
+            return new
 
     def parse(self, msg):
         _part = msg.split("~")
@@ -140,7 +157,7 @@ class Receiver(SDJWT):
 
         # Bring in the disclosures to calculate the payload
 
-        self.payload = evaluate_disclosure(self.jwt, _part[1:-1])
+        self.payload = self.evaluate(self.jwt, _part[1:-2])
 
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:

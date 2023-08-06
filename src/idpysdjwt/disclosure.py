@@ -47,6 +47,9 @@ class ObjectDisclosure(Disclosure):
         _disclosure = as_unicode(b64e(as_bytes(_json_str)))
         return _disclosure, make_hash(_disclosure)
 
+    def eval(self):
+        return {self._name: self._value}
+
 
 class ArrayDisclosure(Disclosure):
 
@@ -66,4 +69,3 @@ class ArrayDisclosure(Disclosure):
             _disc_arr = [self._make_single(val) for val in self._value]
 
         return [(_d, make_hash(_d, hash_func)) for _d in _disc_arr]
-

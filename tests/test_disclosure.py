@@ -1,7 +1,6 @@
 from idpysdjwt.disclosure import ObjectDisclosure
 from idpysdjwt.disclosure import parse_disclosure
 from idpysdjwt.payload import Payload
-from idpysdjwt.payload import evaluate_disclosure
 
 
 def test_disclosure_1():
@@ -28,26 +27,27 @@ def test_hashed_disclosure_2():
 
 
 EndUserClaims = {
-    "given_name": "John",
-    "family_name": "Doe",
-    "email": "johndoe@example.com",
-    "phone_number": "+1-202-555-0101",
-    "phone_number_verified": True,
+    "": {
+        "given_name": "John",
+        "family_name": "Doe",
+    },
     "address": {
         "street_address": "123 Main St",
         "locality": "Anytown",
-        "region": "Anystate",
         "country": "US"
     },
-    "birthdate": "1940-01-01",
-    "updated_at": 1570000000,
+    "foo": {
+        "bar": {
+            "bell": True
+        }
+    }
 }
 
 SELDISC = {
-    "nationalities": [
-        "US",
-        "DE"
-    ]
+    "nationalities": ["US", "DE"],
+    "team": {
+        "group": ['A', 'B']
+    }
 }
 
 
@@ -57,23 +57,15 @@ def test_create_payload():
         iss="https://example.com/issuer",
         iat=1683000000,
         exp=1883000000,
+        address={"country": "SE"}
     )
-    for key, val in EndUserClaims.items():
-        payload.add_object_disclosure(key, val)
-
-    for key, val in SELDISC.items():
-        payload.add_array_disclosure(key, val)
+    payload.add_objects([], EndUserClaims)
+    payload.add_arrays([], SELDISC)
 
     _payload = payload.create(hash_func='sha-256')
 
-    assert set(_payload.keys()) == {'iss', 'nationalities', 'exp', '_sd', '_sd_alg', 'iat', 'sub'}
-    assert len(_payload['nationalities']) == 2
-    assert len(_payload['_sd']) == 8
-
-    kw = evaluate_disclosure(_payload, payload._disclosure)
-
-    assert set(kw.keys()) == {'phone_number', 'updated_at', 'phone_number_verified', 'address',
-                              'birthdate', 'family_name', 'email', 'given_name',
-                              'exp', 'sub', 'iss', 'iat', 'nationalities'}
-
-    assert set(kw['nationalities']) == {"US", "DE"}
+    assert set(_payload.keys()) == {'_sd', '_sd_alg', 'address', 'exp', 'foo',
+                                    'iat', 'iss', 'nationalities', 'sub', 'team'}
+    assert len(_payload['nationalities']) == 1
+    assert len(_payload['nationalities'][0]) == 2
+    assert len(_payload['_sd']) == 2

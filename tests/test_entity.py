@@ -3,10 +3,8 @@ import os
 from cryptojwt import KeyBundle
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
-
 from idpysdjwt.entity import Receiver
 from idpysdjwt.entity import Sender
-from idpysdjwt.payload import evaluate_disclosure
 
 ALICE = "https://example.org/alice"
 BOB = "https://example.com/bob"
@@ -42,26 +40,27 @@ BOB_KEY_JAR = KeyJar()
 BOB_KEY_JAR.import_jwks_as_json(_jwks, ALICE)
 
 EndUserClaims = {
-    "given_name": "John",
-    "family_name": "Doe",
-    "email": "johndoe@example.com",
-    "phone_number": "+1-202-555-0101",
-    "phone_number_verified": True,
+    "": {
+        "given_name": "John",
+        "family_name": "Doe",
+    },
     "address": {
         "street_address": "123 Main St",
         "locality": "Anytown",
-        "region": "Anystate",
         "country": "US"
     },
-    "birthdate": "1940-01-01",
-    "updated_at": 1570000000,
+    "foo": {
+        "bar": {
+            "bell": True
+        }
+    }
 }
 
 SELDISC = {
-    "nationalities": [
-        "US",
-        "DE"
-    ]
+    "nationalities": ["US", "DE"],
+    "team": {
+        "group": ['A', 'B']
+    }
 }
 
 
@@ -92,15 +91,15 @@ def test_sender():
     assert "_sd" in _msg
     assert "_sd_alg" in _msg
     assert "cnf" in _msg
-    assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
+    assert "nationalities" in _msg and len(_msg["nationalities"]) == 1
+    assert len(_msg["nationalities"][0]) == 2
 
     # Bring in the disclosures to calculate the payload
 
-    kw = evaluate_disclosure(_msg, _part[1:-1])
+    kw = alice.evaluate(_msg, _part[1:-1])
 
-    assert set(kw.keys()) == {'phone_number', 'updated_at', 'phone_number_verified', 'address',
-                              'birthdate', 'family_name', 'email', 'given_name',
-                              'exp', 'sub', 'iss', 'iat', 'nationalities', 'aud', 'cnf'}
+    assert set(kw.keys()) == {'address', 'aud', 'cnf', 'exp', 'family_name', 'team',
+                              'foo', 'given_name', 'iat', 'iss', 'nationalities', 'sub'}
 
     assert set(kw['nationalities']) == {"US", "DE"}
 
@@ -123,8 +122,7 @@ def test_sender_receiver():
     bob = Receiver(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
-    assert set(bob.payload.keys()) == {'phone_number', 'updated_at', 'phone_number_verified',
-                                       'address','birthdate', 'family_name', 'email', 'given_name',
-                                       'exp', 'sub', 'iss', 'iat', 'nationalities', 'aud', 'cnf'}
+    assert set(bob.payload.keys()) == {'address', 'aud', 'cnf', 'exp', 'family_name', 'team',
+                                       'foo', 'given_name', 'iat', 'iss', 'nationalities', 'sub'}
 
     assert set(bob.payload['nationalities']) == {"US", "DE"}

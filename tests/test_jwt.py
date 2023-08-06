@@ -5,7 +5,6 @@ from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
 
 from idpysdjwt.jwt import SDJWT
-from idpysdjwt.payload import evaluate_disclosure
 
 ALICE = "https://example.org/alice"
 BOB = "https://example.com/bob"
@@ -37,26 +36,27 @@ ALICE_KEY_JAR.add_kb(ALICE, kb1)
 ALICE_KEY_JAR.add_kb(ALICE, kb2)
 
 EndUserClaims = {
-    "given_name": "John",
-    "family_name": "Doe",
-    "email": "johndoe@example.com",
-    "phone_number": "+1-202-555-0101",
-    "phone_number_verified": True,
+    "": {
+        "given_name": "John",
+        "family_name": "Doe",
+    },
     "address": {
         "street_address": "123 Main St",
         "locality": "Anytown",
-        "region": "Anystate",
         "country": "US"
     },
-    "birthdate": "1940-01-01",
-    "updated_at": 1570000000,
+    "foo": {
+        "bar": {
+            "bell": True
+        }
+    }
 }
 
 SELDISC = {
-    "nationalities": [
-        "US",
-        "DE"
-    ]
+    "nationalities": ["US", "DE"],
+    "team": {
+        "group": ['A', 'B']
+    }
 }
 
 
@@ -81,14 +81,14 @@ def test_jwt_1():
     assert "_sd" in _msg
     assert "_sd_alg" in _msg
     assert "cnf" in _msg
-    assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
+    assert "nationalities" in _msg and len(_msg["nationalities"]) == 1
+    assert len(_msg["nationalities"][0]) == 2
 
     assert len(alice.get_disclosure()) == 10
 
-    kw = evaluate_disclosure(_msg, alice.get_disclosure())
+    kw = alice.evaluate(_msg, alice.get_disclosure())
 
-    assert set(kw.keys()) == {'phone_number', 'updated_at', 'phone_number_verified', 'address',
-                              'birthdate', 'family_name', 'email', 'given_name',
+    assert set(kw.keys()) == {'address', 'family_name', 'given_name', 'foo', 'team',
                               'exp', 'sub', 'iss', 'iat', 'nationalities', 'aud', 'cnf'}
 
     assert set(kw['nationalities']) == {"US", "DE"}
