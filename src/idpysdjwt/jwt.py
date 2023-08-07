@@ -68,11 +68,10 @@ class SDJWT(JWT):
     def _expand_array_disclosure(self, val):
         res = []
         for v in val:
-            if isinstance(v, list) and "..." in v[0]:
-                for ad in v:
-                    _val = self._hash_dict.get(ad["..."])
-                    if _val:
-                        res.append(_val[1])
+            if isinstance(v, dict) and "..." in v:
+                _val = self._hash_dict.get(v["..."])
+                if _val:
+                    res.append(_val[1])
             else:
                 res.append(v)
         return res

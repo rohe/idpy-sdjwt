@@ -66,6 +66,5 @@ def test_create_payload():
 
     assert set(_payload.keys()) == {'_sd', '_sd_alg', 'address', 'exp', 'foo',
                                     'iat', 'iss', 'nationalities', 'sub', 'team'}
-    assert len(_payload['nationalities']) == 1
-    assert len(_payload['nationalities'][0]) == 2
+    assert len(_payload['nationalities']) == 2
     assert len(_payload['_sd']) == 2

@@ -81,8 +81,8 @@ def test_jwt_1():
     assert "_sd" in _msg
     assert "_sd_alg" in _msg
     assert "cnf" in _msg
-    assert "nationalities" in _msg and len(_msg["nationalities"]) == 1
-    assert len(_msg["nationalities"][0]) == 2
+    assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
+    # assert len(_msg["nationalities"][0]) == 2
 
     assert len(alice.get_disclosure()) == 10
 

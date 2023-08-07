@@ -79,10 +79,9 @@ class Payload(object):
             if isinstance(val, list):
                 vis = self._construct(hash_func, val)
             elif isinstance(val, ArrayDisclosure):
-                vis = []
                 for _discl, _hash in val.make(hash_func):
                     self.disclosure.append(_discl)
-                    vis.append({"...": f"{_hash}"})
+                    res.append({"...": f"{_hash}"})
             else:
                 vis = val
 
