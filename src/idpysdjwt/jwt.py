@@ -69,7 +69,7 @@ class SDJWT(JWT):
         res = []
         for v in val:
             if isinstance(v, dict) and "..." in v:
-                _val = self._hash_dict.get(v["..."])
+                _val = self.disclosure_by_hash.get(v["..."])
                 if _val:
                     res.append(_val[1])
             else:
@@ -80,7 +80,7 @@ class SDJWT(JWT):
         res = {}
 
         for _hash in item.get("_sd", []):
-            _val = self._hash_dict.get(_hash)
+            _val = self.disclosure_by_hash.get(_hash)
             if _val:
                 res.update({_val[1]: _val[2]})
 
@@ -99,7 +99,7 @@ class SDJWT(JWT):
 
     def evaluate(self, jwt_payload, selective_disclosures):
         _discl = [parse_disclosure(d, hash_func='sha-256') for d in selective_disclosures]
-        self._hash_dict = {_hash: _disc for _disc, _hash in _discl}
+        self.disclosure_by_hash = {_hash: _disc for _disc, _hash in _discl}
 
         res = self._process(jwt_payload)
 
