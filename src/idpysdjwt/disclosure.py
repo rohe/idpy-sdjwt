@@ -30,6 +30,10 @@ class Disclosure(object):
         raise NotImplementedError()
 
 
+def b64_encode(spec:list) -> str:
+    return as_unicode(b64e(as_bytes(json.dumps(spec))))
+
+
 class ObjectDisclosure(Disclosure):
 
     def __init__(self, value, name: str):
@@ -41,10 +45,11 @@ class ObjectDisclosure(Disclosure):
         _salt = salt or as_unicode(b64e(secrets.token_bytes(16)))
 
         if self._name:
-            _json_str = json.dumps([_salt, self._name, self._value])
+            _spec = [_salt, self._name, self._value]
         else:
-            _json_str = json.dumps([_salt, self._value])
-        _disclosure = as_unicode(b64e(as_bytes(_json_str)))
+            _spec = [_salt, self._value]
+
+        _disclosure = b64_encode(_spec)
         return _disclosure, make_hash(_disclosure)
 
     def eval(self):
@@ -59,8 +64,7 @@ class ArrayDisclosure(Disclosure):
 
     def _make_single(self, val, salt: str = "") -> str:
         _salt = salt or as_unicode(b64e(secrets.token_bytes(16)))
-        _json_str = json.dumps([_salt, val])
-        return as_unicode(b64e(as_bytes(_json_str)))
+        return b64_encode([_salt, val])
 
     def make(self, hash_func: str = "sha-256", salt: List[str] = None) -> list:
         if salt:

@@ -3,6 +3,7 @@ import os
 from cryptojwt import KeyBundle
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
+from cryptojwt.key_jar import build_keyjar
 from idpysdjwt.entity import Receiver
 from idpysdjwt.entity import Sender
 
@@ -15,31 +16,19 @@ def full_path(local_file):
     return os.path.join(BASEDIR, local_file)
 
 
-# k1 = import_private_rsa_key_from_file(full_path('rsa.key'))
-# k2 = import_private_rsa_key_from_file(full_path('size2048.key'))
+ALICE_KEY_JAR = build_keyjar([{"type": "EC", "crv": "P-256", "use": ["sig"]}])
+_priv_jwks = ALICE_KEY_JAR.export_jwks(private=True)
+ALICE_KEY_JAR.import_jwks(_priv_jwks, ALICE)
 
-kb1 = KeyBundle(
-    source="file://{}".format(full_path("rsa.key")),
-    fileformat="der",
-    keyusage="sig",
-    kid="1",
-)
-kb2 = KeyBundle(
-    source="file://{}".format(full_path("size2048.key")),
-    fileformat="der",
-    keyusage="enc",
-    kid="2",
-)
+BOB_KEY_JAR = build_keyjar([{"type": "EC", "crv": "P-256", "use": ["sig"]}])
+CAT_KEY_JAR = KeyJar()
 
-ALICE_KEY_JAR = KeyJar()
-ALICE_KEY_JAR.add_kb(ALICE, kb1)
-ALICE_KEY_JAR.add_kb(ALICE, kb2)
-# Load the opponents keys
-_jwks = ALICE_KEY_JAR.export_jwks_as_json(issuer_id=ALICE)
-BOB_KEY_JAR = KeyJar()
-BOB_KEY_JAR.import_jwks_as_json(_jwks, ALICE)
+_pub_jwks = ALICE_KEY_JAR.export_jwks()
+# Load the issuers keys
+BOB_KEY_JAR.import_jwks(_pub_jwks, ALICE)
+CAT_KEY_JAR.import_jwks(_pub_jwks, ALICE)
 
-EndUserClaims = {
+SELECTIVE_ATTRIBUTE_DISCLOSUER = {
     "": {
         "given_name": "John",
         "family_name": "Doe",
@@ -56,7 +45,7 @@ EndUserClaims = {
     }
 }
 
-SELDISC = {
+SELECTIVE_ARRAY_DISCLOSUER = {
     "nationalities": ["US", "DE"],
     "team": {
         "group": ['A', 'B']
@@ -68,10 +57,10 @@ def test_sender():
     alice = Sender(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
-        sign_alg="RS256",
+        sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=EndUserClaims,
-        array_disclosure=SELDISC
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
     )
 
     payload = {"sub": "sub", "aud": BOB}
@@ -85,7 +74,7 @@ def test_sender():
     # deal with the signed JSON Web Token
     _jwt = factory(_part[0])
     assert _jwt.jwt.headers["typ"] == "example+sd-jwt"
-    assert _jwt.jwt.headers['alg'] == "RS256"
+    assert _jwt.jwt.headers['alg'] == "ES256"
 
     _msg = _jwt.jwt.payload()
     assert "_sd" in _msg
@@ -107,10 +96,10 @@ def test_sender_receiver():
     alice = Sender(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
-        sign_alg="RS256",
+        sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=EndUserClaims,
-        array_disclosure=SELDISC
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
     )
 
     payload = {"sub": "sub", "aud": BOB}
@@ -185,6 +174,8 @@ def test_receiver_msg_1():
     assert len(bob.disclosure_by_hash.keys()) == 9
 
 def test_receiver_msg_2():
+    # Message from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.html
+
     msg = ("eyJhbGciOiAiRVMyNTYifQ.eyJfc2QiOiBbIkNyUWU3UzVrcUJBSHQtbk1ZWGdjNmJkd"
            "DJTSDVhVFkxc1VfTS1QZ2tqUEkiLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5d"
            "TVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHb"
@@ -227,3 +218,38 @@ def test_receiver_msg_2():
     assert bob.payload['nationalities'] == []
 
     assert len(bob.disclosure_by_hash.keys()) == 3
+
+def test_issuer_holder_verifier():
+    alice = Sender(
+        key_jar=ALICE_KEY_JAR,
+        iss=ALICE,
+        sign_alg="ES256",
+        lifetime=600,
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
+    )
+
+    payload = {"sub": "sub", "aud": BOB}
+    _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+
+    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob.parse(_msg)
+
+    # Send to Verifier
+
+    # List of hashes that maps to disclosures
+    release = [['given_name', "John"], ["family_name", "Doe"]]
+    _disclose = []
+    for attr, val in release:
+        for _hash, _spec in bob.disclosure_by_hash.items():
+            if attr == _spec[1] and val == _spec[2]:
+                _disclose.append(_hash)
+
+    _msg = bob.send(_disclose)
+    assert _msg
+
+    cat = Receiver(key_jar=CAT_KEY_JAR)
+    cat.parse(_msg)
+    assert len(cat.disclosure_by_hash) == 2
+    assert cat.payload['address'] == {}
+    assert cat.payload['nationalities'] == []

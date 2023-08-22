@@ -1,11 +1,12 @@
+import json
 from typing import List
 
 from cryptojwt import KeyJar
 from cryptojwt.jwk import DIGEST_HASH
 from cryptojwt.jws.jws import SIGNER_ALGS
-from idpysdjwt import SD_TYP
 from idpysdjwt.jwt import SDJWT
 
+from src.idpysdjwt.disclosure import b64_encode
 
 
 class Sender(SDJWT):
@@ -27,7 +28,8 @@ class Sender(SDJWT):
                  allowed_enc_encs: List[str] = None,
                  zip: str = "",
                  objective_disclosure: dict = None,
-                 array_disclosure: dict = None
+                 array_disclosure: dict = None,
+                 holder_key: dict = None
                  ):
         SDJWT.__init__(self,
                        key_jar=key_jar,
@@ -46,40 +48,14 @@ class Sender(SDJWT):
                        allowed_enc_encs=allowed_enc_encs,
                        zip=zip,
                        objective_disclosure=objective_disclosure,
-                       array_disclosure=array_disclosure
-                       )
+                       array_disclosure=array_disclosure,
+                       holder_key=holder_key)
 
     def add_object_disclosure(self, key: str, value: str):
         self.payload.add_object_disclosure(key, value)
 
     def add_array_disclosure(self, key: str, value: str):
         self.payload.add_array_disclosure(key, value)
-
-    def create_key_binding_jwt(self):
-        return ""
-
-    def create_message(self,
-                       payload, jws_headers: dict = None,
-                       key_binding: bool = False,
-                       **kwargs):
-        if jws_headers is None:
-            jws_headers = {"typ": SD_TYP}
-        elif 'typ' not in jws_headers:
-            jws_headers['typ'] = SD_TYP
-
-        _jws = self.pack(payload=payload, jws_headers=jws_headers, **kwargs)
-
-        # The message format is
-        # <JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>
-        _parts = [_jws]
-        _parts.extend(self.get_disclosure())
-        if key_binding:
-            # _jwt = factory(_jws)
-            _parts.append(self.create_key_binding_jwt())
-        else:
-            _parts.append("")
-
-        return "~".join(_parts)
 
 
 class Receiver(SDJWT):
@@ -102,7 +78,8 @@ class Receiver(SDJWT):
             allowed_enc_encs: List[str] = None,
             zip: str = "",
             objective_disclosure: dict = None,
-            array_disclosure: dict = None
+            array_disclosure: dict = None,
+            message: str = ""
     ):
 
         SDJWT.__init__(self,
@@ -131,6 +108,9 @@ class Receiver(SDJWT):
         self.payload = {}
         self.jwt = None
         self._hash_dict = {}
+        self.message = message
+        if message:
+            self.parse(message)
 
     def add_value(self, orig, new):
         if orig:
@@ -150,6 +130,7 @@ class Receiver(SDJWT):
             return new
 
     def parse(self, msg):
+        self.message = msg
         _part = msg.split("~")
 
         # deal with the signed JSON Web Token
@@ -157,8 +138,21 @@ class Receiver(SDJWT):
 
         # Bring in the disclosures to calculate the payload
 
-        self.payload = self.evaluate(self.jwt, _part[1:-2])
+        self.payload = self.evaluate(self.jwt, _part[1:-1])
 
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:
                 raise ValueError(f"Not recognized hash algorithm {self.payload['_sd_alg']}")
+
+    def create_key_binding_jwt(self):
+        return ""
+
+    def send(self, disclosures: List[str], key_holder_jwt: bool = False):
+        _in_part = self.message.split("~")
+        _out_parts = [_in_part[0]]
+        _out_parts.extend([b64_encode(self.disclosure_by_hash[_hash]) for _hash in disclosures])
+        if key_holder_jwt:
+            _out_parts.append(self.create_key_binding_jwt())
+        else:
+            _out_parts.append('')
+        return "~".join(_out_parts)

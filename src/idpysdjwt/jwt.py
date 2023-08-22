@@ -3,6 +3,7 @@ from typing import List
 
 from cryptojwt import JWT
 from cryptojwt import KeyJar
+from idpysdjwt import SD_TYP
 from idpysdjwt.disclosure import parse_disclosure
 from idpysdjwt.payload import Payload
 
@@ -27,7 +28,8 @@ class SDJWT(JWT):
             allowed_enc_encs: List[str] = None,
             zip: str = "",
             objective_disclosure: dict = None,
-            array_disclosure: dict = None
+            array_disclosure: dict = None,
+            holder_key: dict = None
     ):
         JWT.__init__(self,
                      key_jar=key_jar,
@@ -49,6 +51,7 @@ class SDJWT(JWT):
         self.objective_disclosure = objective_disclosure
         self.array_disclosure = array_disclosure
         self.payload = Payload()
+        self.holder_key = holder_key
 
     def message(self, signing_key, **kwargs):
         self.payload.args = kwargs
@@ -104,3 +107,29 @@ class SDJWT(JWT):
         res = self._process(jwt_payload)
 
         return res
+
+    def create_key_binding_jwt(self):
+        return ""
+
+    def create_message(self,
+                       payload, jws_headers: dict = None,
+                       key_binding: bool = False,
+                       **kwargs):
+        if jws_headers is None:
+            jws_headers = {"typ": SD_TYP}
+        elif 'typ' not in jws_headers:
+            jws_headers['typ'] = SD_TYP
+
+        _jws = self.pack(payload=payload, jws_headers=jws_headers, **kwargs)
+
+        # The message format is
+        # <JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>
+        _parts = [_jws]
+        _parts.extend(self.get_disclosure())
+        if key_binding:
+            # _jwt = factory(_jws)
+            _parts.append(self.create_key_binding_jwt())
+        else:
+            _parts.append("")
+
+        return "~".join(_parts)

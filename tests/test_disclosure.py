@@ -26,7 +26,7 @@ def test_hashed_disclosure_2():
     assert b == _hash
 
 
-EndUserClaims = {
+SELECTIVE_ATTRIBUTE_DISCLOSURE = {
     "": {
         "given_name": "John",
         "family_name": "Doe",
@@ -43,7 +43,7 @@ EndUserClaims = {
     }
 }
 
-SELDISC = {
+SELECTIVE_ARRAY_DISCLOSURE = {
     "nationalities": ["US", "DE"],
     "team": {
         "group": ['A', 'B']
@@ -59,8 +59,8 @@ def test_create_payload():
         exp=1883000000,
         address={"country": "SE"}
     )
-    payload.add_objects([], EndUserClaims)
-    payload.add_arrays([], SELDISC)
+    payload.add_objects([], SELECTIVE_ATTRIBUTE_DISCLOSURE)
+    payload.add_arrays([], SELECTIVE_ARRAY_DISCLOSURE)
 
     _payload = payload.create(hash_func='sha-256')
 
