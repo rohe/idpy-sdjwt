@@ -1,6 +1,5 @@
 import os
 
-from cryptojwt import KeyBundle
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
 from cryptojwt.key_jar import build_keyjar
@@ -79,14 +78,13 @@ def test_sender():
     _msg = _jwt.jwt.payload()
     assert "_sd" in _msg
     assert "_sd_alg" in _msg
-    assert "cnf" in _msg
     assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
 
     # Bring in the disclosures to calculate the payload
 
     kw = alice.evaluate(_msg, _part[1:-1])
 
-    assert set(kw.keys()) == {'address', 'aud', 'cnf', 'exp', 'family_name', 'team',
+    assert set(kw.keys()) == {'address', 'aud', 'exp', 'family_name', 'team',
                               'foo', 'given_name', 'iat', 'iss', 'nationalities', 'sub'}
 
     assert set(kw['nationalities']) == {"US", "DE"}
@@ -110,7 +108,7 @@ def test_sender_receiver():
     bob = Receiver(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
-    assert set(bob.payload.keys()) == {'address', 'aud', 'cnf', 'exp', 'family_name', 'team',
+    assert set(bob.payload.keys()) == {'address', 'aud', 'exp', 'family_name', 'team',
                                        'foo', 'given_name', 'iat', 'iss', 'nationalities', 'sub'}
 
     assert set(bob.payload['nationalities']) == {"US", "DE"}
@@ -169,9 +167,10 @@ def test_receiver_msg_1():
     assert set(bob.payload.keys()) == {'address', 'birthdate', 'cnf', 'email', 'exp',
                                        'family_name', 'given_name', 'iat', 'iss', 'nationalities',
                                        'phone_number', 'phone_number_verified', 'sub', 'updated_at'}
-    assert bob.payload['nationalities'] == ['US']
+    assert bob.payload['nationalities'] == ['US', 'DE']
     assert bob.payload['birthdate'] == '1940-01-01'
-    assert len(bob.disclosure_by_hash.keys()) == 9
+    assert len(bob.disclosure_by_hash.keys()) == 10
+
 
 def test_receiver_msg_2():
     # Message from https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.html
@@ -215,11 +214,13 @@ def test_receiver_msg_2():
                                       'locality': 'Anytown',
                                       'region': 'Anystate',
                                       'street_address': '123 Main St'}
-    assert bob.payload['nationalities'] == []
+    assert bob.payload['nationalities'] == ['US']
 
-    assert len(bob.disclosure_by_hash.keys()) == 3
+    assert len(bob.disclosure_by_hash.keys()) == 4
+
 
 def test_issuer_holder_verifier():
+    # Issuer
     alice = Sender(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
@@ -232,6 +233,7 @@ def test_issuer_holder_verifier():
     payload = {"sub": "sub", "aud": BOB}
     _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
 
+    # Holder
     bob = Receiver(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
@@ -248,6 +250,53 @@ def test_issuer_holder_verifier():
     _msg = bob.send(_disclose)
     assert _msg
 
+    # Verifier
+    cat = Receiver(key_jar=CAT_KEY_JAR)
+    cat.parse(_msg)
+    assert len(cat.disclosure_by_hash) == 2
+    assert cat.payload['address'] == {}
+    assert cat.payload['nationalities'] == []
+
+
+VERIFIER_ID = 'https://example.com/verifier'
+def test_issuer_holder_verifier_holder_of_key():
+    # Issuer
+    alice = Sender(
+        key_jar=ALICE_KEY_JAR,
+        iss=ALICE,
+        sign_alg="ES256",
+        lifetime=600,
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER,
+        holder_key=BOB_KEY_JAR.get_signing_key(key_type="EC")[0]
+    )
+
+    payload = {"sub": "sub", "aud": BOB}
+    _msg = alice.create_message(
+        payload=payload,
+        jws_headers={"typ": "example+sd-jwt"}
+    )
+
+    # Holder
+    bob = Receiver(key_jar=BOB_KEY_JAR, sign_alg="ES256")
+    bob.parse(_msg)
+
+    assert bob.jwt["cnf"]["jwk"] == BOB_KEY_JAR.get_signing_key(key_type="EC")[0].serialize()
+
+    # Send to Verifier
+
+    # List of hashes that maps to disclosures
+    release = [['given_name', "John"], ["family_name", "Doe"]]
+    _disclose = []
+    for attr, val in release:
+        for _hash, _spec in bob.disclosure_by_hash.items():
+            if attr == _spec[1] and val == _spec[2]:
+                _disclose.append(_hash)
+
+    _msg = bob.send(_disclose, key_holder_jwt=True, aud=VERIFIER_ID)
+    assert _msg
+
+    # Verifier
     cat = Receiver(key_jar=CAT_KEY_JAR)
     cat.parse(_msg)
     assert len(cat.disclosure_by_hash) == 2

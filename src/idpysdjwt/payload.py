@@ -114,11 +114,11 @@ class Payload(object):
 
         return res
 
-    def create(self, hash_func: str = "SHA-256", signing_key: AsymmetricKey = None):
+    def create(self, hash_func: str = "SHA-256", holder_key: AsymmetricKey = None):
         res = self._create(self.args, hash_func=hash_func)
         res['_sd_alg'] = hash_func.lower()
-        if signing_key:
+        if holder_key:
             res['cnf'] = {
-                "jwk": signing_key.serialize()
+                "jwk": holder_key.serialize()
             }
         return res

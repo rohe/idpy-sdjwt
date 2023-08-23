@@ -1,9 +1,12 @@
-import json
 from typing import List
 
+from cryptojwt import JWT
 from cryptojwt import KeyJar
 from cryptojwt.jwk import DIGEST_HASH
+from cryptojwt.jwk.jwk import key_from_jwk_dict
 from cryptojwt.jws.jws import SIGNER_ALGS
+from idpyoidc.exception import VerificationError
+from idpyoidc.util import rndstr
 from idpysdjwt.jwt import SDJWT
 
 from src.idpysdjwt.disclosure import b64_encode
@@ -107,6 +110,7 @@ class Receiver(SDJWT):
 
         self.payload = {}
         self.jwt = None
+        self.aud = ""
         self._hash_dict = {}
         self.message = message
         if message:
@@ -140,19 +144,32 @@ class Receiver(SDJWT):
 
         self.payload = self.evaluate(self.jwt, _part[1:-1])
 
+        if _part[-1]:  # holder of key JWT
+            _key = key_from_jwk_dict(self.jwt["cnf"]["jwk"])
+            _keyjar = KeyJar()
+            _keyjar.add_keys(issuer_id="", keys=[_key])
+
+            _jwt = JWT(key_jar=_keyjar)
+            _jws = _jwt.unpack(_part[-1])
+            if not _jws:
+                raise VerificationError("Could not verify holder of key JWT")
+            else:
+                self.aud = _jws["aud"]
+
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:
                 raise ValueError(f"Not recognized hash algorithm {self.payload['_sd_alg']}")
 
-    def create_key_binding_jwt(self):
-        return ""
+    def create_key_binding_jwt(self, aud: str) -> str:
+        _jwt = JWT(self.key_jar, sign_alg=self.alg)
+        return _jwt.pack({'nonce': rndstr()}, aud=aud)
 
-    def send(self, disclosures: List[str], key_holder_jwt: bool = False):
+    def send(self, disclosures: List[str], key_holder_jwt: bool = False, aud: str = ''):
         _in_part = self.message.split("~")
         _out_parts = [_in_part[0]]
         _out_parts.extend([b64_encode(self.disclosure_by_hash[_hash]) for _hash in disclosures])
         if key_holder_jwt:
-            _out_parts.append(self.create_key_binding_jwt())
+            _out_parts.append(self.create_key_binding_jwt(aud))
         else:
             _out_parts.append('')
         return "~".join(_out_parts)

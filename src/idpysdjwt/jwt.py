@@ -1,6 +1,8 @@
 import json
 from typing import List
+from typing import Optional
 
+from cryptojwt import JWK
 from cryptojwt import JWT
 from cryptojwt import KeyJar
 from idpysdjwt import SD_TYP
@@ -53,13 +55,17 @@ class SDJWT(JWT):
         self.payload = Payload()
         self.holder_key = holder_key
 
-    def message(self, signing_key, **kwargs):
+    def message(self,
+                signing_key: Optional[JWK] = None,
+                holder_key: Optional[JWK] = None,
+                **kwargs):
         self.payload.args = kwargs
 
         self.payload.add_objects([], self.objective_disclosure)
         self.payload.add_arrays([], self.array_disclosure)
 
-        _load = self.payload.create(hash_func='sha-256', signing_key=signing_key)
+        holder_key = holder_key or self.holder_key
+        _load = self.payload.create(hash_func='sha-256', holder_key=holder_key)
         return json.dumps(_load)
 
     def get_disclosure(self):
@@ -100,16 +106,13 @@ class SDJWT(JWT):
 
         return res
 
-    def evaluate(self, jwt_payload, selective_disclosures):
+    def evaluate(self, jwt_payload: dict, selective_disclosures: dict = None):
         _discl = [parse_disclosure(d, hash_func='sha-256') for d in selective_disclosures]
         self.disclosure_by_hash = {_hash: _disc for _disc, _hash in _discl}
 
         res = self._process(jwt_payload)
 
         return res
-
-    def create_key_binding_jwt(self):
-        return ""
 
     def create_message(self,
                        payload, jws_headers: dict = None,
