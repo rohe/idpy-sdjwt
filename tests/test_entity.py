@@ -8,6 +8,8 @@ from idpysdjwt.entity import Sender
 
 ALICE = "https://example.org/alice"
 BOB = "https://example.com/bob"
+VERIFIER_ID = 'https://example.com/verifier'  # Charlie
+
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -20,12 +22,14 @@ _priv_jwks = ALICE_KEY_JAR.export_jwks(private=True)
 ALICE_KEY_JAR.import_jwks(_priv_jwks, ALICE)
 
 BOB_KEY_JAR = build_keyjar([{"type": "EC", "crv": "P-256", "use": ["sig"]}])
-CAT_KEY_JAR = KeyJar()
+
+# For these checks doesn't need key of their own.
+CHARLIE_KEY_JAR = KeyJar()
 
 _pub_jwks = ALICE_KEY_JAR.export_jwks()
-# Load the issuers keys
+# Load the alice's keys
 BOB_KEY_JAR.import_jwks(_pub_jwks, ALICE)
-CAT_KEY_JAR.import_jwks(_pub_jwks, ALICE)
+CHARLIE_KEY_JAR.import_jwks(_pub_jwks, ALICE)
 
 SELECTIVE_ATTRIBUTE_DISCLOSUER = {
     "": {
@@ -251,14 +255,13 @@ def test_issuer_holder_verifier():
     assert _msg
 
     # Verifier
-    cat = Receiver(key_jar=CAT_KEY_JAR)
-    cat.parse(_msg)
-    assert len(cat.disclosure_by_hash) == 2
-    assert cat.payload['address'] == {}
-    assert cat.payload['nationalities'] == []
+    charlie = Receiver(key_jar=CHARLIE_KEY_JAR)
+    charlie.parse(_msg)
+    assert len(charlie.disclosure_by_hash) == 2
+    assert charlie.payload['address'] == {}
+    assert charlie.payload['nationalities'] == []
 
 
-VERIFIER_ID = 'https://example.com/verifier'
 def test_issuer_holder_verifier_holder_of_key():
     # Issuer
     alice = Sender(
@@ -297,8 +300,10 @@ def test_issuer_holder_verifier_holder_of_key():
     assert _msg
 
     # Verifier
-    cat = Receiver(key_jar=CAT_KEY_JAR)
-    cat.parse(_msg)
-    assert len(cat.disclosure_by_hash) == 2
-    assert cat.payload['address'] == {}
-    assert cat.payload['nationalities'] == []
+    charlie = Receiver(key_jar=CHARLIE_KEY_JAR)
+    charlie.parse(_msg)
+    assert charlie.aud == VERIFIER_ID  # It's for me
+    assert len(charlie.disclosure_by_hash) == len(release)  # only two data items disclosed
+    # Will tell the verifier that there data on these attributes but not what they are
+    assert charlie.payload['address'] == {}  #
+    assert charlie.payload['nationalities'] == []
