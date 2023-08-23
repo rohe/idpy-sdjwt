@@ -12,7 +12,7 @@ from idpysdjwt.jwt import SDJWT
 from src.idpysdjwt.disclosure import b64_encode
 
 
-class Sender(SDJWT):
+class Issuer(SDJWT):
 
     def __init__(self,
                  key_jar: KeyJar = None,
@@ -61,7 +61,7 @@ class Sender(SDJWT):
         self.payload.add_array_disclosure(key, value)
 
 
-class Receiver(SDJWT):
+class Verifier(SDJWT):
 
     def __init__(
             self,
@@ -116,23 +116,6 @@ class Receiver(SDJWT):
         if message:
             self.parse(message)
 
-    def add_value(self, orig, new):
-        if orig:
-            if isinstance(orig, list):
-                if isinstance(new, list):
-                    orig.extend(new)
-                else:
-                    orig.append(new)
-            else:
-                orig = [orig]
-                if isinstance(new, list):
-                    orig.extend(new)
-                else:
-                    orig.append(new)
-            return orig
-        else:
-            return new
-
     def parse(self, msg):
         self.message = msg
         _part = msg.split("~")
@@ -159,6 +142,26 @@ class Receiver(SDJWT):
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:
                 raise ValueError(f"Not recognized hash algorithm {self.payload['_sd_alg']}")
+
+
+class Holder(Verifier):
+
+    def add_value(self, orig, new):
+        if orig:
+            if isinstance(orig, list):
+                if isinstance(new, list):
+                    orig.extend(new)
+                else:
+                    orig.append(new)
+            else:
+                orig = [orig]
+                if isinstance(new, list):
+                    orig.extend(new)
+                else:
+                    orig.append(new)
+            return orig
+        else:
+            return new
 
     def create_key_binding_jwt(self, aud: str) -> str:
         _jwt = JWT(self.key_jar, sign_alg=self.alg)

@@ -3,8 +3,9 @@ import os
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
 from cryptojwt.key_jar import build_keyjar
-from idpysdjwt.entity import Receiver
-from idpysdjwt.entity import Sender
+from idpysdjwt.entity import Holder
+from idpysdjwt.entity import Issuer
+from idpysdjwt.entity import Verifier
 
 ALICE = "https://example.org/alice"
 BOB = "https://example.com/bob"
@@ -57,7 +58,7 @@ SELECTIVE_ARRAY_DISCLOSUER = {
 
 
 def test_sender():
-    alice = Sender(
+    alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
         sign_alg="ES256",
@@ -95,7 +96,7 @@ def test_sender():
 
 
 def test_sender_receiver():
-    alice = Sender(
+    alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
         sign_alg="ES256",
@@ -109,7 +110,7 @@ def test_sender_receiver():
 
     # msg is what is sent to the receiver
 
-    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob = Verifier(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
     assert set(bob.payload.keys()) == {'address', 'aud', 'exp', 'family_name', 'team',
@@ -166,7 +167,7 @@ def test_receiver_msg_1():
            "DAwMDAwXQ~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0~WyJuUHVvUW5rUk"
            "ZxM0JJZUFtN0FuWEZBIiwgIkRFIl0~")
 
-    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob = Verifier(key_jar=BOB_KEY_JAR)
     bob.parse(msg)
     assert set(bob.payload.keys()) == {'address', 'birthdate', 'cnf', 'email', 'exp',
                                        'family_name', 'given_name', 'iat', 'iss', 'nationalities',
@@ -207,7 +208,7 @@ def test_receiver_msg_2():
            "yIiwgImlhdCI6IDE2ODgxNjA0ODN9.tKnLymr8fQfupOgvMgBK3GCEIDEzhgta4MgnxY"
            "m9fWGMkqrz2R5PSkv0I-AXKXtIF6bdZRbjL-t43vC87jVoZQ")
 
-    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob = Verifier(key_jar=BOB_KEY_JAR)
     bob.parse(msg)
     assert set(bob.payload.keys()) == {'address', 'cnf', 'exp', 'family_name',
                                        'given_name', 'iat', 'iss', 'nationalities', 'sub'}
@@ -225,7 +226,7 @@ def test_receiver_msg_2():
 
 def test_issuer_holder_verifier():
     # Issuer
-    alice = Sender(
+    alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
         sign_alg="ES256",
@@ -238,7 +239,7 @@ def test_issuer_holder_verifier():
     _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
 
     # Holder
-    bob = Receiver(key_jar=BOB_KEY_JAR)
+    bob = Holder(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
     # Send to Verifier
@@ -255,7 +256,7 @@ def test_issuer_holder_verifier():
     assert _msg
 
     # Verifier
-    charlie = Receiver(key_jar=CHARLIE_KEY_JAR)
+    charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_msg)
     assert len(charlie.disclosure_by_hash) == 2
     assert charlie.payload['address'] == {}
@@ -264,7 +265,7 @@ def test_issuer_holder_verifier():
 
 def test_issuer_holder_verifier_holder_of_key():
     # Issuer
-    alice = Sender(
+    alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
         sign_alg="ES256",
@@ -281,7 +282,7 @@ def test_issuer_holder_verifier_holder_of_key():
     )
 
     # Holder
-    bob = Receiver(key_jar=BOB_KEY_JAR, sign_alg="ES256")
+    bob = Holder(key_jar=BOB_KEY_JAR, sign_alg="ES256")
     bob.parse(_msg)
 
     assert bob.jwt["cnf"]["jwk"] == BOB_KEY_JAR.get_signing_key(key_type="EC")[0].serialize()
@@ -300,10 +301,10 @@ def test_issuer_holder_verifier_holder_of_key():
     assert _msg
 
     # Verifier
-    charlie = Receiver(key_jar=CHARLIE_KEY_JAR)
+    charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_msg)
     assert charlie.aud == VERIFIER_ID  # It's for me
     assert len(charlie.disclosure_by_hash) == len(release)  # only two data items disclosed
-    # Will tell the verifier that there data on these attributes but not what they are
+    # Will tell the verifier that there are data on these attributes but not what they are
     assert charlie.payload['address'] == {}  #
     assert charlie.payload['nationalities'] == []
