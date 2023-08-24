@@ -133,11 +133,11 @@ class Verifier(SDJWT):
             _keyjar.add_keys(issuer_id="", keys=[_key])
 
             _jwt = JWT(key_jar=_keyjar)
-            _jws = _jwt.unpack(_part[-1])
-            if not _jws:
+            _holder_of_key = _jwt.unpack(_part[-1])
+            if not _holder_of_key:
                 raise VerificationError("Could not verify holder of key JWT")
             else:
-                self.aud = _jws["aud"]
+                self.payload_audience = _holder_of_key["aud"]
 
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:

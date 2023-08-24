@@ -32,7 +32,7 @@ _pub_jwks = ALICE_KEY_JAR.export_jwks()
 BOB_KEY_JAR.import_jwks(_pub_jwks, ALICE)
 CHARLIE_KEY_JAR.import_jwks(_pub_jwks, ALICE)
 
-SELECTIVE_ATTRIBUTE_DISCLOSUER = {
+SELECTIVE_ATTRIBUTE_DISCLOSURES = {
     "": {
         "given_name": "John",
         "family_name": "Doe",
@@ -49,7 +49,7 @@ SELECTIVE_ATTRIBUTE_DISCLOSUER = {
     }
 }
 
-SELECTIVE_ARRAY_DISCLOSUER = {
+SELECTIVE_ARRAY_DISCLOSURES = {
     "nationalities": ["US", "DE"],
     "team": {
         "group": ['A', 'B']
@@ -63,8 +63,8 @@ def test_sender():
         iss=ALICE,
         sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
-        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSURES,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSURES
     )
 
     payload = {"sub": "sub", "aud": BOB}
@@ -101,8 +101,8 @@ def test_sender_receiver():
         iss=ALICE,
         sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
-        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSURES,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSURES
     )
 
     payload = {"sub": "sub", "aud": BOB}
@@ -231,8 +231,8 @@ def test_issuer_holder_verifier():
         iss=ALICE,
         sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
-        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSURES,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSURES
     )
 
     payload = {"sub": "sub", "aud": BOB}
@@ -258,6 +258,7 @@ def test_issuer_holder_verifier():
     # Verifier
     charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_msg)
+    assert charlie.aud == ""  # There is no key binding JWT
     assert len(charlie.disclosure_by_hash) == 2
     assert charlie.payload['address'] == {}
     assert charlie.payload['nationalities'] == []
@@ -270,8 +271,8 @@ def test_issuer_holder_verifier_holder_of_key():
         iss=ALICE,
         sign_alg="ES256",
         lifetime=600,
-        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSUER,
-        array_disclosure=SELECTIVE_ARRAY_DISCLOSUER,
+        objective_disclosure=SELECTIVE_ATTRIBUTE_DISCLOSURES,
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSURES,
         holder_key=BOB_KEY_JAR.get_signing_key(key_type="EC")[0]
     )
 
@@ -303,7 +304,7 @@ def test_issuer_holder_verifier_holder_of_key():
     # Verifier
     charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_msg)
-    assert charlie.aud == VERIFIER_ID  # It's for me
+    assert charlie.payload_audience == VERIFIER_ID  # It's for me
     assert len(charlie.disclosure_by_hash) == len(release)  # only two data items disclosed
     # Will tell the verifier that there are data on these attributes but not what they are
     assert charlie.payload['address'] == {}  #
