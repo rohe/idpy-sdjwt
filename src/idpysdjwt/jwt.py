@@ -1,12 +1,7 @@
-import json
 from typing import List
-from typing import Optional
 
-from cryptojwt import JWK
 from cryptojwt import JWT
 from cryptojwt import KeyJar
-from idpysdjwt import SD_TYP
-from idpysdjwt.disclosure import parse_disclosure
 from idpysdjwt.payload import Payload
 
 
@@ -50,89 +45,3 @@ class SDJWT(JWT):
                      allowed_enc_encs=allowed_enc_encs,
                      zip=zip,
                      )
-        self.objective_disclosure = objective_disclosure
-        self.array_disclosure = array_disclosure
-        self.payload = Payload()
-        self.holder_key = holder_key
-
-    def message(self,
-                signing_key: Optional[JWK] = None,
-                holder_key: Optional[JWK] = None,
-                **kwargs):
-        self.payload.args = kwargs
-
-        self.payload.add_objects([], self.objective_disclosure)
-        self.payload.add_arrays([], self.array_disclosure)
-
-        holder_key = holder_key or self.holder_key
-        _load = self.payload.create(hash_func='sha-256', holder_key=holder_key)
-        return json.dumps(_load)
-
-    def get_disclosure(self):
-        if not self.payload.disclosure:
-            return ""
-        else:
-            return self.payload.disclosure
-
-    def _expand_array_disclosure(self, val):
-        res = []
-        for v in val:
-            if isinstance(v, dict) and "..." in v:
-                _val = self.disclosure_by_hash.get(v["..."])
-                if _val:
-                    res.append(_val[1])
-            else:
-                res.append(v)
-        return res
-
-    def _process(self, item: dict) -> dict:
-        res = {}
-
-        for _hash in item.get("_sd", []):
-            _val = self.disclosure_by_hash.get(_hash)
-            if _val:
-                res.update({_val[1]: _val[2]})
-
-        for k, v in item.items():
-            if k in ['_sd', '_sd_alg']:
-                continue
-
-            if isinstance(v, dict):
-                res[k] = self._process(v)
-            elif isinstance(v, list):
-                res[k] = self._expand_array_disclosure(v)
-            else:
-                res[k] = v
-
-        return res
-
-    def evaluate(self, jwt_payload: dict, selective_disclosures: dict = None):
-        _discl = [parse_disclosure(d, hash_func='sha-256') for d in selective_disclosures]
-        self.disclosure_by_hash = {_hash: _disc for _disc, _hash in _discl}
-
-        res = self._process(jwt_payload)
-
-        return res
-
-    def create_message(self,
-                       payload, jws_headers: dict = None,
-                       key_binding: bool = False,
-                       **kwargs):
-        if jws_headers is None:
-            jws_headers = {"typ": SD_TYP}
-        elif 'typ' not in jws_headers:
-            jws_headers['typ'] = SD_TYP
-
-        _jws = self.pack(payload=payload, jws_headers=jws_headers, **kwargs)
-
-        # The message format is
-        # <JWT>~<Disclosure 1>~<Disclosure 2>~...~<Disclosure N>~<optional KB-JWT>
-        _parts = [_jws]
-        _parts.extend(self.get_disclosure())
-        if key_binding:
-            # _jwt = factory(_jws)
-            _parts.append(self.create_key_binding_jwt())
-        else:
-            _parts.append("")
-
-        return "~".join(_parts)

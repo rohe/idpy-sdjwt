@@ -59,7 +59,7 @@ Similar with array disclosure
         }
     }
 
-After having created the Issuer instance and configured it to you liking you 
+After having created the Issuer instance and configured it to your liking you 
 can create the message
 
     payload = {"sub": "sub", "aud": BOB}
@@ -73,7 +73,7 @@ https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-05.htm
 
 Create a Holder instance
 
-    bob = Holder(key_jar=BOB_KEY_JAR)
+    bob = Holder(key_jar=BOB_KEY_JAR, iss=HOLDER_ID)
 
 and then parse the message
 
@@ -109,4 +109,4 @@ And lastly we will bring in the Verifier
     Charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_holder_msg)
     # verify that it is for me
-    charlie.payload.audience == C
+    charlie.payload_audience == VERIFIER_ID

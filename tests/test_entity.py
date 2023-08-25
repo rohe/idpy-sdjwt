@@ -3,13 +3,13 @@ import os
 from cryptojwt import KeyJar
 from cryptojwt.jws.jws import factory
 from cryptojwt.key_jar import build_keyjar
-from idpysdjwt.entity import Holder
-from idpysdjwt.entity import Issuer
-from idpysdjwt.entity import Verifier
+from idpysdjwt.holder import Holder
+from idpysdjwt.issuer import Issuer
+from idpysdjwt.verifier import Verifier
 
-ALICE = "https://example.org/alice"
-BOB = "https://example.com/bob"
-VERIFIER_ID = 'https://example.com/verifier'  # Charlie
+ALICE = "https://example.org/issuer"
+BOB = "https://example.com/holder"
+CHARLIE = 'https://example.com/verifier'  # Charlie
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -57,7 +57,7 @@ SELECTIVE_ARRAY_DISCLOSURES = {
 }
 
 
-def test_sender():
+def test_issuer():
     alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
@@ -68,7 +68,7 @@ def test_sender():
     )
 
     payload = {"sub": "sub", "aud": BOB}
-    _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+    _msg = alice.create_holder_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
 
     # msg is what is sent to the receiver
 
@@ -85,17 +85,8 @@ def test_sender():
     assert "_sd_alg" in _msg
     assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
 
-    # Bring in the disclosures to calculate the payload
 
-    kw = alice.evaluate(_msg, _part[1:-1])
-
-    assert set(kw.keys()) == {'address', 'aud', 'exp', 'family_name', 'team',
-                              'foo', 'given_name', 'iat', 'iss', 'nationalities', 'sub'}
-
-    assert set(kw['nationalities']) == {"US", "DE"}
-
-
-def test_sender_receiver():
+def test_issuer_holder():
     alice = Issuer(
         key_jar=ALICE_KEY_JAR,
         iss=ALICE,
@@ -106,11 +97,11 @@ def test_sender_receiver():
     )
 
     payload = {"sub": "sub", "aud": BOB}
-    _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+    _msg = alice.create_holder_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
 
     # msg is what is sent to the receiver
 
-    bob = Verifier(key_jar=BOB_KEY_JAR)
+    bob = Holder(key_jar=BOB_KEY_JAR)
     bob.parse(_msg)
 
     assert set(bob.payload.keys()) == {'address', 'aud', 'exp', 'family_name', 'team',
@@ -236,7 +227,7 @@ def test_issuer_holder_verifier():
     )
 
     payload = {"sub": "sub", "aud": BOB}
-    _msg = alice.create_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+    _msg = alice.create_holder_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
 
     # Holder
     bob = Holder(key_jar=BOB_KEY_JAR)
@@ -252,7 +243,7 @@ def test_issuer_holder_verifier():
             if attr == _spec[1] and val == _spec[2]:
                 _disclose.append(_hash)
 
-    _msg = bob.send(_disclose)
+    _msg = bob.create_verifier_message(_disclose)
     assert _msg
 
     # Verifier
@@ -277,7 +268,7 @@ def test_issuer_holder_verifier_holder_of_key():
     )
 
     payload = {"sub": "sub", "aud": BOB}
-    _msg = alice.create_message(
+    _msg = alice.create_holder_message(
         payload=payload,
         jws_headers={"typ": "example+sd-jwt"}
     )
@@ -298,13 +289,13 @@ def test_issuer_holder_verifier_holder_of_key():
             if attr == _spec[1] and val == _spec[2]:
                 _disclose.append(_hash)
 
-    _msg = bob.send(_disclose, key_holder_jwt=True, aud=VERIFIER_ID)
+    _msg = bob.create_verifier_message(_disclose, key_holder_jwt=True, aud=CHARLIE)
     assert _msg
 
     # Verifier
     charlie = Verifier(key_jar=CHARLIE_KEY_JAR)
     charlie.parse(_msg)
-    assert charlie.payload_audience == VERIFIER_ID  # It's for me
+    assert charlie.payload_audience == CHARLIE  # It's for me
     assert len(charlie.disclosure_by_hash) == len(release)  # only two data items disclosed
     # Will tell the verifier that there are data on these attributes but not what they are
     assert charlie.payload['address'] == {}  #
