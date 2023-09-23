@@ -27,9 +27,9 @@ class Issuer(JWT):
                  allowed_enc_algs: List[str] = None,
                  allowed_enc_encs: List[str] = None,
                  zip: str = "",
-                 objective_disclosure: dict = None,
-                 array_disclosure: dict = None,
-                 holder_key: dict = None
+                 objective_disclosure: Optional[dict] = None,
+                 array_disclosure: Optional[dict] = None,
+                 holder_key: Optional[dict] = None
                  ):
         JWT.__init__(self,
                        key_jar=key_jar,
@@ -84,10 +84,13 @@ class Issuer(JWT):
                 signing_key: Optional[JWK] = None, # Not used
                 holder_key: Optional[JWK] = None,
                 **kwargs):
+        # This is used as a callback from cryptojwt.JWT
         self.payload.args = kwargs
 
-        self.payload.add_objects([], self.objective_disclosure)
-        self.payload.add_arrays([], self.array_disclosure)
+        if self.objective_disclosure:
+            self.payload.add_objects([], self.objective_disclosure)
+        if self.array_disclosure:
+            self.payload.add_arrays([], self.array_disclosure)
 
         holder_key = holder_key or self.holder_key
         _load = self.payload.construct(hash_func='sha-256', holder_key=holder_key)

@@ -86,6 +86,34 @@ def test_issuer():
     assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
 
 
+def test_issuer_2():
+    alice = Issuer(
+        key_jar=ALICE_KEY_JAR,
+        iss=ALICE,
+        sign_alg="ES256",
+        lifetime=600,
+        objective_disclosure={"": {}},
+        array_disclosure=SELECTIVE_ARRAY_DISCLOSURES
+    )
+
+    payload = {"sub": "sub", "aud": BOB}
+    _msg = alice.create_holder_message(payload=payload, jws_headers={"typ": "example+sd-jwt"})
+
+    # msg is what is sent to the receiver
+
+    _part = _msg.split("~")
+    assert len(_part) == 12
+
+    # deal with the signed JSON Web Token
+    _jwt = factory(_part[0])
+    assert _jwt.jwt.headers["typ"] == "example+sd-jwt"
+    assert _jwt.jwt.headers['alg'] == "ES256"
+
+    _msg = _jwt.jwt.payload()
+    assert "_sd" in _msg
+    assert "_sd_alg" in _msg
+    assert "nationalities" in _msg and len(_msg["nationalities"]) == 2
+
 def test_issuer_holder():
     alice = Issuer(
         key_jar=ALICE_KEY_JAR,
