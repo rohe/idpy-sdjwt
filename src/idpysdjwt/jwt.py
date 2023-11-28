@@ -2,7 +2,6 @@ from typing import List
 
 from cryptojwt import JWT
 from cryptojwt import KeyJar
-from idpysdjwt.payload import Payload
 
 
 class SDJWT(JWT):

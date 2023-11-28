@@ -6,6 +6,7 @@ from cryptojwt.exception import VerificationError
 from cryptojwt.jwk import DIGEST_HASH
 from cryptojwt.jwk.jwk import key_from_jwk_dict
 from cryptojwt.jws.jws import SIGNER_ALGS
+from cryptojwt.jws.jws import factory
 from idpysdjwt.disclosure import parse_disclosure
 
 
@@ -32,22 +33,22 @@ class Verifier(JWT):
     ):
 
         JWT.__init__(self,
-                       key_jar=key_jar,
-                       iss=iss,
-                       lifetime=lifetime,
-                       sign=sign,
-                       sign_alg=sign_alg,
-                       encrypt=encrypt,
-                       enc_enc=enc_enc,
-                       enc_alg=enc_alg,
-                       msg_cls=msg_cls,
-                       iss2msg_cls=iss2msg_cls,
-                       skew=skew,
-                       allowed_sign_algs=allowed_sign_algs,
-                       allowed_enc_algs=allowed_enc_algs,
-                       allowed_enc_encs=allowed_enc_encs,
-                       zip=zip,
-                       )
+                     key_jar=key_jar,
+                     iss=iss,
+                     lifetime=lifetime,
+                     sign=sign,
+                     sign_alg=sign_alg,
+                     encrypt=encrypt,
+                     enc_enc=enc_enc,
+                     enc_alg=enc_alg,
+                     msg_cls=msg_cls,
+                     iss2msg_cls=iss2msg_cls,
+                     skew=skew,
+                     allowed_sign_algs=allowed_sign_algs,
+                     allowed_enc_algs=allowed_enc_algs,
+                     allowed_enc_encs=allowed_enc_encs,
+                     zip=zip,
+                     )
         if allowed_sign_algs is None:
             allowed_sign_algs = list(SIGNER_ALGS.keys())
             allowed_sign_algs.remove('none')
@@ -126,3 +127,12 @@ class Verifier(JWT):
         if "_sd_alg" in self.payload:
             if self.payload['_sd_alg'] not in DIGEST_HASH:
                 raise ValueError(f"Not recognized hash algorithm {self.payload['_sd_alg']}")
+
+
+def display_sdjwt(msg):
+    _part = msg.split("~")
+
+    # deal with the signed JSON Web Token
+    _payload = factory(_part[0]).jwt.payload()
+    _discl = [parse_disclosure(d, hash_func='sha-256') for d in _part[1:-1]]
+    return _payload, _discl

@@ -97,7 +97,7 @@ select which attributes to disclose:
             if attr == _spec[1] and val == _spec[2]:
                 _disclose.append(_hash)
 
-    # add a key holder jwt and mark the verifier as the audience for the message
+    # To add a key holder jwt and mark the verifier as the audience of the message
     _holder_msg = bob.send(_disclose, key_holder_jwt=True, aud=VERIFIER_ID)
 
 And lastly we will bring in the Verifier
